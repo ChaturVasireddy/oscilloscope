@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>RP2350 Oscilloscope</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #111;
+            color: white;
+            margin: 30px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            margin-bottom: 15px;
+        }
+
+        #status {
+            margin-bottom: 15px;
+        }
+
+        canvas {
+            width: 100%;
+            max-width: 1000px;
+            height: 400px;
+            border: 1px solid #555;
+            background: black;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>RP2350 Oscilloscope</h1>
+
+    <button id="connect">Connect RP2350</button>
+
+    <div id="status">Disconnected</div>
+
+    <canvas id="scope" width="1000" height="400"></canvas>
+
+    <script src="main.js"></script>
+
+</body>
+</html>
