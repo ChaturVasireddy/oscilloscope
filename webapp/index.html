@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <meta charset="UTF-8">
     <title>RP2350 Oscilloscope</title>
@@ -22,12 +23,33 @@
             margin-bottom: 15px;
         }
 
+        .measurements {
+            display: flex;
+            gap: 24px;
+            margin-bottom: 15px;
+            font-family: monospace;
+            font-size: 16px;
+        }
+
         canvas {
             width: 100%;
             max-width: 1000px;
             height: 400px;
             border: 1px solid #555;
             background: black;
+        }
+
+        .scope-view {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        #zoom {
+            width: 20px;
+            height: 400px;
+            writing-mode: vertical-lr;
+            direction: rtl;
         }
     </style>
 </head>
@@ -37,12 +59,24 @@
     <h1>RP2350 Oscilloscope</h1>
 
     <button id="connect">Connect RP2350</button>
+    <button id="autoset">Autoset</button>
+    <button id="pause">Pause</button>
 
     <div id="status">Disconnected</div>
 
-    <canvas id="scope" width="1000" height="400"></canvas>
+    <div class="measurements">
+        <span>Vpp: <strong id="vpp">--</strong></span>
+        <span>Vmax: <strong id="vmax">--</strong></span>
+        <span>Frequency: <strong id="frequency">--</strong></span>
+    </div>
+
+    <div class="scope-view">
+        <canvas id="scope" width="1000" height="400"></canvas>
+        <input id="zoom" type="range" min="2" max="5000" value="1000" step="1" aria-label="Zoom">
+    </div>
 
     <script src="main.js"></script>
 
 </body>
+
 </html>

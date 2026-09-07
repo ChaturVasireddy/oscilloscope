@@ -1,14 +1,25 @@
 const connectButton = document.getElementById("connect");
+const autosetButton = document.getElementById("autoset");
+const pauseButton = document.getElementById("pause");
 const status = document.getElementById("status");
 
 const canvas = document.getElementById("scope");
 const ctx = canvas.getContext("2d");
+const zoomSlider = document.getElementById("zoom");
+const vppValue = document.getElementById("vpp");
+const vmaxValue = document.getElementById("vmax");
+const frequencyValue = document.getElementById("frequency");
 
 const BUFFER_SIZE = 5000;
 
 const samples = new Uint8Array(BUFFER_SIZE);
 let writeIndex = 0;
+let bufferedSamples = 0;
+let receivedSamples = 0;
+let sampleRate = 0;
+let sampleRateStart = 0;
 let connected = false;
+let paused = false;
 
 // -------------------------
 // Zoom / view settings
@@ -16,6 +27,10 @@ let connected = false;
 
 // Number of samples currently visible
 let visibleSamples = 1000;
+
+// ADC midpoint and total value range shown by the canvas
+let displayCenter = 127.5;
+let displayRange = 255;
 
 // Position of the right edge of the view
 // 0 = newest samples
@@ -71,6 +86,10 @@ async function readSerial(port) {
 
             if (value) {
 
+                if (sampleRateStart === 0) {
+                    sampleRateStart = performance.now();
+                }
+
                 for (let i = 0; i < value.length; i++) {
 
                     samples[writeIndex] = value[i];
@@ -81,6 +100,20 @@ async function readSerial(port) {
                         writeIndex = 0;
                     }
 
+                    bufferedSamples = Math.min(
+                        BUFFER_SIZE,
+                        bufferedSamples + 1
+                    );
+
+                    receivedSamples++;
+
+                }
+
+                const elapsedSeconds =
+                    (performance.now() - sampleRateStart) / 1000;
+
+                if (elapsedSeconds > 0) {
+                    sampleRate = receivedSamples / elapsedSeconds;
                 }
 
             }
@@ -119,11 +152,75 @@ function getSample(indexFromNewest) {
 }
 
 
+function updateMeasurements() {
+
+    const sampleCount = Math.min(
+        Math.floor(visibleSamples),
+        bufferedSamples
+    );
+
+    if (sampleCount < 2) {
+        return;
+    }
+
+    let minimum = 255;
+    let maximum = 0;
+    const midpoint = displayCenter;
+    const crossings = [];
+    let previousSample = getSample(viewOffset + sampleCount - 1);
+
+    for (let samplePosition = sampleCount - 1; samplePosition >= 0; samplePosition--) {
+
+        const sample = getSample(viewOffset + samplePosition);
+
+        minimum = Math.min(minimum, sample);
+        maximum = Math.max(maximum, sample);
+
+        if (previousSample < midpoint && sample >= midpoint) {
+            crossings.push(samplePosition);
+        }
+
+        previousSample = sample;
+
+    }
+
+    const peakToPeak = (maximum - minimum) * 3.3 / 255;
+    const maximumVoltage = maximum * 3.3 / 255;
+
+    vppValue.textContent = `${peakToPeak.toFixed(2)} V`;
+    vmaxValue.textContent = `${maximumVoltage.toFixed(2)} V`;
+
+    if (crossings.length >= 2 && sampleRate > 0) {
+
+        const periods = [];
+
+        for (let i = 1; i < crossings.length; i++) {
+            periods.push(crossings[i - 1] - crossings[i]);
+        }
+
+        const averagePeriod =
+            periods.reduce((total, period) => total + period, 0) / periods.length;
+
+        const frequency = sampleRate / averagePeriod;
+        frequencyValue.textContent = `${frequency.toFixed(1)} Hz est.`;
+
+    } else {
+        frequencyValue.textContent = "--";
+    }
+
+}
+
+
 // -------------------------
 // Draw waveform
 // -------------------------
 
 function draw() {
+
+    if (paused) {
+        requestAnimationFrame(draw);
+        return;
+    }
 
     const width = canvas.width;
     const height = canvas.height;
@@ -163,13 +260,15 @@ function draw() {
     ctx.beginPath();
 
 
-    for (let x = 0; x < width; x++) {
+    const sampleCount = Math.min(
+        Math.max(2, Math.floor(visibleSamples)),
+        Math.max(2, bufferedSamples)
+    );
 
-        // Which sample should appear at this pixel?
-        const samplePosition =
-            Math.floor(
-                x * visibleSamples / width
-            );
+    for (let samplePosition = 0; samplePosition < sampleCount; samplePosition++) {
+
+        const x =
+            samplePosition * width / (sampleCount - 1);
 
         const sample =
             getSample(
@@ -177,8 +276,8 @@ function draw() {
             );
 
         const y =
-            height -
-            (sample / 255) * height;
+            height / 2 -
+            ((sample - displayCenter) / displayRange) * height;
 
 
         if (x === 0) {
@@ -190,6 +289,8 @@ function draw() {
     }
 
     ctx.stroke();
+
+    updateMeasurements();
 
 
     // Center line
@@ -207,48 +308,119 @@ function draw() {
 
 
 // -------------------------
-// Mouse-wheel zoom
+// Pause display
 // -------------------------
 
-canvas.addEventListener("wheel", (event) => {
+pauseButton.addEventListener("click", () => {
 
-    event.preventDefault();
+    paused = !paused;
+    pauseButton.textContent = paused ? "Resume" : "Pause";
+    status.textContent = paused ? "Paused" : connected ? "Connected" : "Disconnected";
 
-    const oldVisibleSamples = visibleSamples;
+});
 
-    if (event.deltaY < 0) {
-        visibleSamples *= 0.98;
-    } else {
-        visibleSamples *= 1.02;
-    }
 
-    // Clamp zoom
-    visibleSamples = Math.max(
-        50,
-        Math.min(BUFFER_SIZE, visibleSamples)
+// -------------------------
+// Autoset timebase and vertical scale
+// -------------------------
+
+autosetButton.addEventListener("click", () => {
+
+    const sampleCount = Math.min(
+        BUFFER_SIZE,
+        bufferedSamples
     );
 
+    if (sampleCount < 2) {
+        status.textContent = "Autoset waiting for waveform data";
+        return;
+    }
 
-    // Keep the point under the mouse
-    // approximately stationary
+    let minimum = 255;
+    let maximum = 0;
+    let sum = 0;
+    let previousSample = getSample(sampleCount - 1);
 
-    const mouseRatio =
-        event.offsetX / canvas.width;
+    for (let samplePosition = 0; samplePosition < sampleCount; samplePosition++) {
 
-    const mouseSample =
-        mouseRatio * oldVisibleSamples;
+        const sample = getSample(samplePosition);
 
-    const newMouseSample =
-        mouseRatio * visibleSamples;
+        minimum = Math.min(minimum, sample);
+        maximum = Math.max(maximum, sample);
+        sum += sample;
 
-    viewOffset +=
-        mouseSample - newMouseSample;
+        previousSample = sample;
+
+    }
+
+    displayCenter = sum / sampleCount;
+    displayRange = Math.max(
+        16,
+        Math.min(255, (maximum - minimum) * 1.25)
+    );
+
+    const crossings = [];
+    previousSample = getSample(sampleCount - 1);
+
+    for (let samplePosition = sampleCount - 2; samplePosition >= 0; samplePosition--) {
+
+        const sample = getSample(samplePosition);
+
+        if (previousSample < displayCenter && sample >= displayCenter) {
+            crossings.push(samplePosition);
+        }
+
+        previousSample = sample;
+
+    }
+
+    if (crossings.length >= 2) {
+
+        const periods = [];
+
+        for (let i = 1; i < crossings.length; i++) {
+            periods.push(crossings[i - 1] - crossings[i]);
+        }
+
+        const averagePeriod =
+            periods.reduce((total, period) => total + period, 0) / periods.length;
+
+        visibleSamples = Math.max(
+            2,
+            Math.min(BUFFER_SIZE, Math.round(averagePeriod * 5))
+        );
+
+        zoomSlider.value = visibleSamples;
+
+        const centerCrossing = crossings[Math.floor(crossings.length / 2)];
+        viewOffset = centerCrossing - Math.floor(visibleSamples / 2);
+
+    } else {
+        status.textContent = "Autoset needs at least two cycles";
+        return;
+    }
+
+    const maxOffset = Math.max(0, bufferedSamples - visibleSamples);
+
+    viewOffset = Math.max(
+        0,
+        Math.min(maxOffset, viewOffset)
+    );
+
+    status.textContent = "Autoset complete";
+
+});
 
 
-    // Clamp offset
+// -------------------------
+// Slider zoom
+// -------------------------
 
-    const maxOffset =
-        BUFFER_SIZE - visibleSamples;
+zoomSlider.addEventListener("input", () => {
+
+    visibleSamples = Number(zoomSlider.value);
+
+    const maxOffset = BUFFER_SIZE - visibleSamples;
 
     viewOffset = Math.max(
         0,
@@ -318,6 +490,9 @@ canvas.addEventListener("dblclick", () => {
 
     visibleSamples = 1000;
     viewOffset = 0;
+    displayCenter = 127.5;
+    displayRange = 255;
+    zoomSlider.value = visibleSamples;
 
 });
 
