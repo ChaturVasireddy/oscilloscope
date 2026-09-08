@@ -1,82 +1,29 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>RP2350 Oscilloscope</title>
-
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            background: #111;
-            color: white;
-            margin: 30px;
-        }
-
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            margin-bottom: 15px;
-        }
-
-        #status {
-            margin-bottom: 15px;
-        }
-
-        .measurements {
-            display: flex;
-            gap: 24px;
-            margin-bottom: 15px;
-            font-family: monospace;
-            font-size: 16px;
-        }
-
-        canvas {
-            width: 100%;
-            max-width: 1000px;
-            height: 400px;
-            border: 1px solid #555;
-            background: black;
-        }
-
-        .scope-view {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        #zoom {
-            width: 20px;
-            height: 400px;
-            writing-mode: vertical-lr;
-            direction: rtl;
-        }
-    </style>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RP2350 Oscilloscope</title>
+<link rel="stylesheet" href="style.css">
 </head>
-
 <body>
-
-    <h1>RP2350 Oscilloscope</h1>
-
-    <button id="connect">Connect RP2350</button>
-    <button id="autoset">Autoset</button>
-    <button id="pause">Pause</button>
-
-    <div id="status">Disconnected</div>
-
-    <div class="measurements">
-        <span>Vpp: <strong id="vpp">--</strong></span>
-        <span>Vmax: <strong id="vmax">--</strong></span>
-        <span>Frequency: <strong id="frequency">--</strong></span>
-    </div>
-
-    <div class="scope-view">
-        <canvas id="scope" width="1000" height="400"></canvas>
-        <input id="zoom" type="range" min="2" max="5000" value="1000" step="1" aria-label="Zoom">
-    </div>
-
-    <script src="main.js"></script>
-
-</body>
-
-</html>
+<main>
+<header><div><p class="eyebrow">SIGNAL WORKBENCH / CH 01</p><h1>RP2350 Oscilloscope</h1></div><span class="badge">8-bit · USB serial</span></header>
+<section class="toolbar" aria-label="Acquisition controls">
+<button id="connect" class="primary">Connect RP2350</button><button id="demo">Start demo</button><button id="pause">Pause</button><button id="autoset">Autoset</button><button id="reset">Reset view</button>
+<div class="spacer"></div><button id="csv">Export CSV</button><button id="png">Save image</button>
+</section>
+<p id="status" role="status">Disconnected — connect a device or start the demo.</p>
+<section class="measurements" aria-label="Signal measurements">
+<div>Peak to peak<strong id="vpp">—</strong></div><div>Maximum<strong id="vmax">—</strong></div><div>Minimum<strong id="vmin">—</strong></div><div>Mean<strong id="mean">—</strong></div><div>RMS<strong id="rms">—</strong></div><div>Frequency<strong id="frequency">—</strong></div>
+</section>
+<section class="plot"><div class="plot-heading"><span><i></i> CH 1 <small>0–3.3 V input</small></span><span id="scale">Waiting for samples</span></div><canvas id="scope" width="1200" height="480" aria-label="Oscilloscope waveform, oldest samples on the left"></canvas><div class="plot-footer"><span id="acquisition">No samples</span><span>Drag to pan · Scroll to zoom · Double-click to reset</span></div></section>
+<section class="controls" aria-label="Display controls">
+<label>Time window <output id="windowValue">1000 samples</output><input id="zoom" type="range" min="16" max="5000" value="1000"></label>
+<label>Vertical span <select id="vertical"><option value="auto">Autoset scale</option><option value="255">3.30 V</option><option value="128">1.66 V</option><option value="64">0.83 V</option><option value="32">0.41 V</option></select></label>
+<label>Trigger <select id="trigger"><option value="rising">Rising edge</option><option value="falling">Falling edge</option><option value="off">Free running</option></select></label>
+<label>Sample rate (samples/s)<input id="rate" type="number" min="1" max="100000000" placeholder="Auto estimate"></label>
+</section>
+<p class="hint">Pause freezes a capture for inspection. Autoset fits the amplitude and about five cycles. Enter the actual sample rate for accurate timing; USB arrival timing is only an estimate. Voltage assumes an uncalibrated 3.3 V full scale.</p>
+</main>
+<script src="signal.js"></script><script src="main.js"></script>
+</body></html>
