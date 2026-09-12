@@ -127,7 +127,7 @@ $('csv').onclick = () => {
 $('png').onclick = () => canvas.toBlob(blob => { if (blob) download(blob, 'scope-capture.png'); });
 function draw() {
     const width = canvas.width, height = canvas.height;
-    ctx.fillStyle = '#0b151c'; ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = '#000000'; ctx.fillRect(0, 0, width, height);
     ctx.lineWidth = 1; ctx.strokeStyle = '#20313c'; ctx.beginPath();
     for (let x = 0; x <= width; x += width / 10) { ctx.moveTo(x, 0); ctx.lineTo(x, height); }
     for (let y = 0; y <= height; y += height / 8) { ctx.moveTo(0, y); ctx.lineTo(width, y); }
